@@ -25,6 +25,21 @@ object AiClient {
     fun followUp(baseUrl: String, apiKey: String, model: String, question: StudyQuestion): String =
         complete(baseUrl, apiKey, model, PromptBuilder.forFollowUp(question))
 
+    fun models(baseUrl: String, apiKey: String): List<String> {
+        require(apiKey.isNotBlank()) { "请先在设置中填写 API Key" }
+        val request = HttpRequest.newBuilder(modelsUrl(baseUrl))
+            .timeout(Duration.ofSeconds(30))
+            .header("Authorization", "Bearer ${apiKey.trim()}")
+            .GET()
+            .build()
+        val response = client.send(request, HttpResponse.BodyHandlers.ofString())
+        if (response.statusCode() !in 200..299) error("获取模型失败 (${response.statusCode()}): ${response.body().take(300)}")
+        val root = JsonParser.parseString(response.body()).asJsonObject
+        return root.getAsJsonArray("data")?.mapNotNull { item ->
+            item.asJsonObject.get("id")?.asString?.trim()?.takeIf(String::isNotBlank)
+        }?.sorted().orEmpty().ifEmpty { error("没有获取到模型列表") }
+    }
+
     fun generateFromMaterial(
         baseUrl: String,
         apiKey: String,
@@ -82,10 +97,14 @@ object AiClient {
             ?: error("AI 返回格式不正确")
     }
 
-    private fun chatUrl(baseUrl: String): URI {
+    private fun chatUrl(baseUrl: String): URI = URI.create("${apiBaseUrl(baseUrl)}/chat/completions")
+
+    private fun modelsUrl(baseUrl: String): URI = URI.create("${apiBaseUrl(baseUrl)}/models")
+
+    private fun apiBaseUrl(baseUrl: String): String {
         val clean = baseUrl.trim().trimEnd('/')
         require(clean.startsWith("http://") || clean.startsWith("https://")) { "Base URL 必须以 http:// 或 https:// 开头" }
-        val versioned = if (Regex("/v\\d+$").containsMatchIn(clean)) clean else "$clean/v1"
-        return URI.create("$versioned/chat/completions")
+        return if (Regex("/v\\d+$").containsMatchIn(clean)) clean else "$clean/v1"
     }
 }
+

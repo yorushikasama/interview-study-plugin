@@ -390,6 +390,7 @@ private class SettingsPanel(private val state: StudyState) : JPanel(BorderLayout
     init {
         val save = JButton("保存")
         val test = JButton("测试连接")
+        val fetchModels = JButton("获取模型")
         save.addActionListener { save(); status.text = "已保存" }
         test.addActionListener {
             save()
@@ -398,11 +399,26 @@ private class SettingsPanel(private val state: StudyState) : JPanel(BorderLayout
                 Unit
             }, done = { status.text = "连接成功" })
         }
+        fetchModels.addActionListener {
+            save()
+            runAsync(fetchModels, status, "正在获取模型...", task = {
+                AiClient.models(baseUrl.text, String(apiKey.password))
+            }, done = { models ->
+                val selected = JOptionPane.showInputDialog(this, "选择模型", "模型列表", JOptionPane.PLAIN_MESSAGE, null, models.toTypedArray(), model.text)
+                if (selected != null) {
+                    model.text = selected.toString()
+                    save()
+                    status.text = "已选择模型：${model.text}"
+                } else {
+                    status.text = "已获取 ${models.size} 个模型"
+                }
+            })
+        }
         add(formPanel(
             "Base URL" to baseUrl,
             "API Key" to apiKey,
             "模型名" to model,
-            "" to JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply { add(save); add(test) },
+            "" to JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply { add(save); add(test); add(fetchModels) },
             "" to status
         ), BorderLayout.NORTH)
         border = BorderFactory.createEmptyBorder(8, 8, 8, 8)
@@ -436,4 +452,5 @@ private fun <T> runAsync(button: JButton, status: JLabel, message: String, task:
         )
     }
 }
+
 
