@@ -234,8 +234,10 @@ private class PracticePanel(private val state: StudyState) : JPanel(BorderLayout
             add(actions(), BorderLayout.SOUTH)
         }
         add(filters(), BorderLayout.NORTH)
-        add(JScrollPane(list).apply { preferredSize = Dimension(320, 500) }, BorderLayout.WEST)
-        add(detail, BorderLayout.CENTER)
+        add(JSplitPane(JSplitPane.VERTICAL_SPLIT, JScrollPane(list), detail).apply {
+            resizeWeight = 0.35
+            dividerLocation = 260
+        }, BorderLayout.CENTER)
         refresh()
     }
 
@@ -452,5 +454,6 @@ private fun <T> runAsync(button: JButton, status: JLabel, message: String, task:
         )
     }
 }
+
 
 
