@@ -12,6 +12,7 @@ import com.interviewstudy.core.QuestionBank
 import com.interviewstudy.core.QuestionFilters
 import com.interviewstudy.core.ReviewSchedule
 import com.interviewstudy.core.StudyQuestion
+import com.interviewstudy.core.answerText
 import com.interviewstudy.core.markReview
 import com.interviewstudy.core.reviewStatus
 import java.awt.BorderLayout
@@ -250,7 +251,7 @@ private class PracticePanel(private val state: StudyState) : JPanel(BorderLayout
         val known = JButton("会了")
         val next = JButton("下一题")
         val more = JButton("更多")
-        answer.addActionListener { list.selectedValue?.let { reference.text = "参考答案：\n${it.answer}" } }
+        answer.addActionListener { list.selectedValue?.let { reference.text = "参考答案：\n${it.answerText()}" } }
         wrong.addActionListener { updateReview(false) }
         known.addActionListener { updateReview(true) }
         next.addActionListener { nextQuestion() }
@@ -444,7 +445,4 @@ private fun <T> runAsync(button: JButton, status: JLabel, message: String, task:
         )
     }
 }
-
-
-
 

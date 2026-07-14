@@ -30,6 +30,10 @@ object CoreBehaviorCheck {
         val choice = AiQuestionParser.parse("""{"questions":[{"title":"哪个是 JVM 参数？","type":"single_choice","difficulty":"简单","tags":["JVM"],"answer":"A","options":[{"key":"A","text":"-Xmx"},{"key":"B","text":"SELECT"}]}]}""").single()
         check(choice.type == "single_choice")
         check(choice.options.size == 2)
+        check(choice.answerText().contains("A. -Xmx"))
+        val explainedChoice = AiQuestionParser.parse("""{"questions":[{"title":"事务失效原因？","type":"single_choice","difficulty":"中等","tags":["Spring"],"answer":"C","explanation":"C 会吞掉异常，事务拦截器感知不到回滚条件。","options":[{"key":"C","text":"try-catch 中吞掉 RuntimeException"},{"key":"D","text":"默认回滚 RuntimeException"}]}]}""").single()
+        check(explainedChoice.explanation.contains("事务拦截器"))
+        check(explainedChoice.answerText().contains("解析"))
         val shortPlan = MaterialProcessing.plan("短资料")
         check(shortPlan.chunks == listOf("短资料"))
         check(!shortPlan.isLarge)
@@ -51,3 +55,4 @@ object CoreBehaviorCheck {
         check(runCatching { MaterialProcessing.plan(excessive) }.exceptionOrNull()?.message?.contains("20") == true)
     }
 }
+

@@ -13,6 +13,7 @@ data class StudyQuestion(
     var difficulty: String = "中等",
     var tags: MutableList<String> = mutableListOf(),
     var answer: String = "",
+    var explanation: String = "",
     var options: MutableList<QuestionOption> = mutableListOf(),
     var source: String = "",
     var favorite: Boolean = false,
@@ -43,13 +44,26 @@ fun StudyQuestion.markReview(known: Boolean, todayEpochDay: Long = LocalDate.now
     nextReviewEpochDay = todayEpochDay + days
 }
 
+fun StudyQuestion.answerText(): String = buildString {
+    append(answer)
+    val detail = explanation.ifBlank { selectedOptionText() }
+    if (detail.isNotBlank()) append("\n\n解析：\n").append(detail)
+}
+
+private fun StudyQuestion.selectedOptionText(): String {
+    if (type != "single_choice") return ""
+    val key = answer.trim().firstOrNull()?.uppercaseChar()?.toString() ?: return ""
+    val option = options.firstOrNull { it.key.equals(key, ignoreCase = true) } ?: return ""
+    return "${option.key}. ${option.text}"
+}
+
 object ReviewSchedule {
     private val intervals = intArrayOf(1, 2, 4, 7, 14, 30)
     fun daysUntilNextReview(level: Int) = intervals[level.coerceIn(0, intervals.lastIndex)]
 }
 
 object PromptBuilder {
-    private const val schema = """{"questions":[{"title":"题干","type":"qa|single_choice","difficulty":"简单|中等|偏难","tags":["标签"],"answer":"参考答案","options":[{"key":"A","text":"选项"}]}]}"""
+    private const val schema = """{"questions":[{"title":"题干","type":"qa|single_choice","difficulty":"简单|中等|偏难","tags":["标签"],"answer":"参考答案或正确选项","explanation":"解析，说明为什么答案正确以及其他选项为什么不合适","options":[{"key":"A","text":"选项"}]}]}"""
 
     fun forJob(role: String, level: String, stack: String, direction: String, count: Int) = build(
         count,
@@ -66,13 +80,13 @@ object PromptBuilder {
     fun forReview(question: StudyQuestion, userAnswer: String): String = """请你扮演面试官，对下面的回答做简洁批改。
 题目：${question.title}
 题型：${question.type}
-参考答案：${question.answer}
+参考答案：${question.answerText()}
 我的回答：$userAnswer
 要求：输出评分（满分 10 分）、优点、缺口、改进后的参考回答；只返回纯文本，不要 JSON，不要 Markdown。"""
 
     fun forFollowUp(question: StudyQuestion): String = """请基于下面这道面试题继续追问 3 个更深入的问题，并给出每个问题的考察点。
 题目：${question.title}
-参考答案：${question.answer}
+参考答案：${question.answerText()}
 要求：只返回纯文本，不要 JSON，不要 Markdown。"""
 
     fun forKnowledgeNotes(name: String, direction: String, content: String, index: Int, total: Int): String {
@@ -86,7 +100,7 @@ object PromptBuilder {
         return """请生成 $count 道中文技术面试题。
 $source
 方向：${direction.trim().ifBlank { "综合考察" }}
-要求：题目准确、有区分度，答案适合面试复习；根据内容自动混合问答题和单选题；单选题至少提供 2 个选项，answer 包含正确选项。只返回 JSON，不要解释或 Markdown。
+要求：题目准确、有区分度，答案适合面试复习；根据内容自动混合问答题和单选题；单选题至少提供 2 个选项，answer 写正确选项，explanation 写清楚解析。只返回 JSON，不要解释或 Markdown。
 JSON 格式：$schema"""
     }
 }
@@ -109,6 +123,7 @@ object AiQuestionParser {
                 difficulty = item.string("difficulty", "中等"),
                 tags = item.getAsJsonArray("tags")?.map { it.asString }?.toMutableList() ?: mutableListOf(),
                 answer = item.requiredString("answer"),
+                explanation = item.string("explanation", ""),
                 options = options
             )
         }.filter { it.title.isNotBlank() }
@@ -121,3 +136,4 @@ object AiQuestionParser {
     private fun com.google.gson.JsonObject.string(name: String, fallback: String) =
         get(name)?.takeUnless { it.isJsonNull }?.asString?.trim().orEmpty().ifBlank { fallback }
 }
+
