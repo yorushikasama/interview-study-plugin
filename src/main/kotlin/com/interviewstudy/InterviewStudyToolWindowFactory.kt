@@ -194,21 +194,21 @@ private class GeneratePanel(private val state: StudyState, private val onGenerat
     }
 }
 
-private class PracticePanel(private val state: StudyState) : JPanel(BorderLayout(8, 8)) {
+private class PracticePanel(private val state: StudyState) : JPanel(BorderLayout(6, 6)) {
     private val model = DefaultListModel<StudyQuestion>()
     private val list = JList(model)
     private val keyword = JTextField()
-    private val type = JComboBox(arrayOf("全部题型", "qa", "single_choice"))
+    private val type = JComboBox(arrayOf("全部", "qa", "single_choice"))
     private val tag = JTextField()
     private val source = JTextField()
-    private val dueOnly = JCheckBox("今日复习")
+    private val dueOnly = JCheckBox("今日")
     private val favoriteOnly = JCheckBox("收藏")
     private val wrongOnly = JCheckBox("错题")
     private val question = JTextArea()
-    private val answerInput = JTextArea()
-    private val reference = JTextArea("先作答，再点击“显示参考答案”")
+    private val reference = JTextArea("点“答案”再自测")
     private val stats = JLabel()
     private val status = JLabel()
+    private var currentQuestions: List<StudyQuestion> = emptyList()
 
     init {
         border = BorderFactory.createEmptyBorder(8, 8, 8, 8)
@@ -217,90 +217,69 @@ private class PracticePanel(private val state: StudyState) : JPanel(BorderLayout
             override fun getListCellRendererComponent(list: JList<*>?, value: Any?, index: Int, selected: Boolean, focus: Boolean): Component {
                 val item = value as? StudyQuestion
                 val today = LocalDate.now().toEpochDay()
-                return super.getListCellRendererComponent(list, item?.let {
-                    "${if (it.favorite) "★" else ""}${it.reviewStatus(today)} · ${it.difficulty} · ${it.title}"
-                }, index, selected, focus)
+                return super.getListCellRendererComponent(list, item?.let { "${if (it.favorite) "★" else ""}${it.reviewStatus(today)} · ${it.difficulty} · ${it.title}" }, index, selected, focus)
             }
         }
         list.addListSelectionListener { if (!it.valueIsAdjusting) show(list.selectedValue) }
-
-        listOf(question, answerInput, reference).forEach { area -> area.lineWrap = true; area.wrapStyleWord = true }
-        question.isEditable = false
-        reference.isEditable = false
-
-        val detail = JPanel(BorderLayout(6, 6)).apply {
-            add(JScrollPane(question).apply { preferredSize = Dimension(400, 140) }, BorderLayout.NORTH)
-            add(JSplitPane(JSplitPane.VERTICAL_SPLIT, JScrollPane(answerInput), JScrollPane(reference)).apply { resizeWeight = 0.55 }, BorderLayout.CENTER)
-            add(actions(), BorderLayout.SOUTH)
-        }
-        add(filters(), BorderLayout.NORTH)
-        add(JSplitPane(JSplitPane.VERTICAL_SPLIT, JScrollPane(list), detail).apply {
-            resizeWeight = 0.35
-            dividerLocation = 260
-        }, BorderLayout.CENTER)
+        listOf(question, reference).forEach { area -> area.isEditable = false; area.lineWrap = true; area.wrapStyleWord = true }
+        add(toolbar(), BorderLayout.NORTH)
+        add(JSplitPane(JSplitPane.VERTICAL_SPLIT, JScrollPane(question), JScrollPane(reference)).apply { resizeWeight = 0.6 }, BorderLayout.CENTER)
+        add(actions(), BorderLayout.SOUTH)
         refresh()
     }
 
-    private fun filters(): JPanel {
-        val refresh = JButton("筛选")
-        val clear = JButton("清空")
-        val more = JButton("更多筛选")
+    private fun toolbar(): JPanel {
+        val library = JButton("题库")
+        val refresh = JButton("搜")
+        val more = JButton("更多")
+        library.addActionListener { showLibrary() }
         refresh.addActionListener { refresh() }
-        clear.addActionListener {
-            keyword.text = ""; tag.text = ""; source.text = ""; type.selectedIndex = 0
-            dueOnly.isSelected = false; favoriteOnly.isSelected = false; wrongOnly.isSelected = false
-            refresh()
-        }
         more.addActionListener {
             JOptionPane.showMessageDialog(this, formPanel("标签" to tag, "来源" to source), "更多筛选", JOptionPane.PLAIN_MESSAGE)
             refresh()
         }
-        return JPanel(BorderLayout(6, 4)).apply {
-            add(JPanel(BorderLayout(6, 0)).apply {
-                add(JLabel("搜索"), BorderLayout.WEST)
-                add(keyword, BorderLayout.CENTER)
-            }, BorderLayout.NORTH)
-            add(JPanel(FlowLayout(FlowLayout.LEFT, 4, 0)).apply {
-                add(type); add(dueOnly); add(favoriteOnly); add(wrongOnly); add(refresh); add(clear); add(more); add(stats)
-            }, BorderLayout.CENTER)
+        return JPanel(BorderLayout(4, 4)).apply {
+            add(JPanel(BorderLayout(4, 0)).apply { add(keyword, BorderLayout.CENTER); add(library, BorderLayout.EAST) }, BorderLayout.NORTH)
+            add(JPanel(FlowLayout(FlowLayout.LEFT, 4, 0)).apply { add(type); add(dueOnly); add(favoriteOnly); add(wrongOnly); add(refresh); add(more); add(stats) }, BorderLayout.CENTER)
         }
     }
 
     private fun actions(): JPanel {
-        val show = JButton("显示参考答案")
+        val answer = JButton("答案")
         val wrong = JButton("不会")
         val known = JButton("会了")
-        val mastered = JButton("已掌握")
+        val next = JButton("下一题")
+        val more = JButton("更多")
+        answer.addActionListener { list.selectedValue?.let { reference.text = "参考答案：\n${it.answer}" } }
+        wrong.addActionListener { updateReview(false) }
+        known.addActionListener { updateReview(true) }
+        next.addActionListener { nextQuestion() }
+        more.addActionListener { showMoreActions() }
+        return JPanel(FlowLayout(FlowLayout.LEFT, 4, 0)).apply { add(answer); add(wrong); add(known); add(next); add(more); add(status) }
+    }
+
+    private fun showLibrary() {
+        JOptionPane.showMessageDialog(this, JScrollPane(list).apply { preferredSize = Dimension(360, 420) }, "题库", JOptionPane.PLAIN_MESSAGE)
+    }
+
+    private fun showMoreActions() {
         val favorite = JButton("收藏/取消")
         val markWrong = JButton("错题/取消")
+        val mastered = JButton("已掌握")
         val review = JButton("AI 批改")
         val followUp = JButton("AI 追问")
         val export = JButton("导出")
         val import = JButton("导入")
         val delete = JButton("删除")
-        val more = JButton("更多操作")
-        show.addActionListener { list.selectedValue?.let { reference.text = it.answer } }
-        wrong.addActionListener { updateReview(false) }
-        known.addActionListener { updateReview(true) }
-        mastered.addActionListener { list.selectedValue?.let { it.reviewLevel = 5; it.isWrong = false; it.markReview(true); refresh() } }
         favorite.addActionListener { list.selectedValue?.let { it.favorite = !it.favorite; refresh() } }
         markWrong.addActionListener { list.selectedValue?.let { it.isWrong = !it.isWrong; refresh() } }
-        review.addActionListener { ai(review, true) }
-        followUp.addActionListener { ai(followUp, false) }
+        mastered.addActionListener { list.selectedValue?.let { it.reviewLevel = 5; it.isWrong = false; it.markReview(true); refresh() } }
+        review.addActionListener { askAndReview(review) }
+        followUp.addActionListener { ai(followUp, null) }
         export.addActionListener { exportQuestions() }
         import.addActionListener { importQuestions() }
         delete.addActionListener { list.selectedValue?.let { if (confirm("删除这道题？")) { state.state.questions.remove(it); refresh() } } }
-        more.addActionListener {
-            JOptionPane.showMessageDialog(
-                this,
-                JPanel(FlowLayout(FlowLayout.LEFT)).apply { add(favorite); add(markWrong); add(review); add(followUp); add(export); add(import); add(delete) },
-                "更多操作",
-                JOptionPane.PLAIN_MESSAGE
-            )
-        }
-        return JPanel(FlowLayout(FlowLayout.LEFT, 4, 0)).apply {
-            add(show); add(wrong); add(known); add(mastered); add(more); add(status)
-        }
+        JOptionPane.showMessageDialog(this, JPanel(FlowLayout(FlowLayout.LEFT)).apply { add(favorite); add(markWrong); add(mastered); add(review); add(followUp); add(export); add(import); add(delete) }, "更多操作", JOptionPane.PLAIN_MESSAGE)
     }
 
     private fun show(item: StudyQuestion?) {
@@ -308,36 +287,48 @@ private class PracticePanel(private val state: StudyState) : JPanel(BorderLayout
             buildString {
                 append(it.title)
                 if (it.options.isNotEmpty()) append("\n\n").append(it.options.joinToString("\n") { option -> "${option.key}. ${option.text}" })
-                append("\n\n来源：${it.source}　标签：${it.tags.joinToString("、")}")
-                append("\n状态：${it.reviewStatus()}　下次复习：${reviewDate(it.nextReviewEpochDay)}")
+                append("\n\n来源：${it.source}\n标签：${it.tags.joinToString("、")}")
+                append("\n状态：${it.reviewStatus()}　下次：${reviewDate(it.nextReviewEpochDay)}")
             }
         }.orEmpty()
-        answerInput.text = ""
-        reference.text = "先作答，再点击“显示参考答案”"
+        reference.text = "先心里答一遍，再点“答案”。"
         status.text = ""
     }
 
     private fun updateReview(known: Boolean) {
         val item = list.selectedValue ?: return
         item.markReview(known)
-        status.text = "下次复习：${reviewDate(item.nextReviewEpochDay)}"
+        status.text = "下次：${reviewDate(item.nextReviewEpochDay)}"
         refresh()
+        nextQuestion()
     }
 
-    private fun ai(button: JButton, reviewAnswer: Boolean) {
+    private fun nextQuestion() {
+        if (currentQuestions.isEmpty()) return
+        list.selectedIndex = (list.selectedIndex + 1).let { if (it >= currentQuestions.size) 0 else it }
+    }
+
+    private fun askAndReview(button: JButton) {
+        val answerInput = JTextArea().apply { lineWrap = true; wrapStyleWord = true }
+        if (JOptionPane.showConfirmDialog(this, JScrollPane(answerInput).apply { preferredSize = Dimension(360, 180) }, "写下你的回答", JOptionPane.OK_CANCEL_OPTION) == JOptionPane.OK_OPTION) {
+            ai(button, answerInput.text)
+        }
+    }
+
+    private fun ai(button: JButton, userAnswer: String?) {
         val item = list.selectedValue ?: return
-        runAsync(button, status, "正在调用 AI...", task = {
+        runAsync(button, status, "AI 中...", task = {
             val data = state.state
-            if (reviewAnswer) AiClient.reviewAnswer(data.baseUrl, state.apiKey(), data.model, item, answerInput.text)
+            if (userAnswer != null) AiClient.reviewAnswer(data.baseUrl, state.apiKey(), data.model, item, userAnswer)
             else AiClient.followUp(data.baseUrl, state.apiKey(), data.model, item)
-        }, done = { reference.text = it; status.text = "AI 返回完成" })
+        }, done = { reference.text = it; status.text = "AI 完成" })
     }
 
     private fun exportQuestions() {
         val chooser = JFileChooser().apply { selectedFile = java.io.File("interview-questions.json") }
         if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return
         chooser.selectedFile.writeText(QuestionBank.exportJson(state.state.questions), Charsets.UTF_8)
-        status.text = "已导出 ${state.state.questions.size} 道题"
+        status.text = "已导出 ${state.state.questions.size} 道"
     }
 
     private fun importQuestions() {
@@ -345,7 +336,7 @@ private class PracticePanel(private val state: StudyState) : JPanel(BorderLayout
         if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return
         val imported = QuestionBank.importJson(chooser.selectedFile.readText(Charsets.UTF_8))
         state.state.questions.addAll(imported)
-        status.text = "已导入 ${imported.size} 道题"
+        status.text = "已导入 ${imported.size} 道"
         refresh()
     }
 
@@ -354,21 +345,21 @@ private class PracticePanel(private val state: StudyState) : JPanel(BorderLayout
         val today = LocalDate.now().toEpochDay()
         val filters = QuestionFilters(
             keyword = keyword.text,
-            type = (type.selectedItem as String).takeUnless { it == "全部题型" }.orEmpty(),
+            type = (type.selectedItem as String).takeUnless { it == "全部" }.orEmpty(),
             tag = tag.text,
             source = source.text,
             dueOnly = dueOnly.isSelected,
             favoriteOnly = favoriteOnly.isSelected,
             wrongOnly = wrongOnly.isSelected
         )
-        val questions = QuestionBank.filter(state.state.questions, filters, today)
+        currentQuestions = QuestionBank.filter(state.state.questions, filters, today)
         val summary = QuestionBank.stats(state.state.questions, today)
-        stats.text = "共 ${summary.total}，今日 ${summary.due}，已练 ${summary.reviewedToday}，掌握率 ${summary.masteryRate}%"
+        stats.text = "${summary.due}/${summary.total}"
         model.clear()
-        questions.forEach(model::addElement)
-        val index = questions.indexOfFirst { it.id == selectedId }.takeIf { it >= 0 } ?: if (questions.isEmpty()) -1 else 0
+        currentQuestions.forEach(model::addElement)
+        val index = currentQuestions.indexOfFirst { it.id == selectedId }.takeIf { it >= 0 } ?: if (currentQuestions.isEmpty()) -1 else 0
         list.selectedIndex = index
-        if (questions.isEmpty()) question.text = if (state.state.questions.isEmpty()) "暂无题目，请先到“生成题目”页生成。" else "筛选无结果，请清空或调整筛选条件。"
+        if (currentQuestions.isEmpty()) question.text = if (state.state.questions.isEmpty()) "暂无题目，先去生成。" else "没搜到，换个条件。"
     }
 
     private fun reviewDate(epochDay: Long): String {
@@ -382,7 +373,6 @@ private class PracticePanel(private val state: StudyState) : JPanel(BorderLayout
 
     private fun confirm(message: String) = JOptionPane.showConfirmDialog(this, message, "确认", JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION
 }
-
 private class SettingsPanel(private val state: StudyState) : JPanel(BorderLayout()) {
     private val baseUrl = JTextField(state.state.baseUrl)
     private val model = JTextField(state.state.model)
@@ -454,6 +444,7 @@ private fun <T> runAsync(button: JButton, status: JLabel, message: String, task:
         )
     }
 }
+
 
 
 
