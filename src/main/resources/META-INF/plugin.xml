@@ -1,0 +1,15 @@
+<idea-plugin>
+    <id>com.interviewstudy.plugin</id>
+    <name>Interview Study</name>
+    <vendor>Local</vendor>
+    <description><![CDATA[
+        在 IntelliJ IDEA 中根据岗位或资料生成面试题，并通过主动回答和复习计划持续学习。
+    ]]></description>
+    <depends>com.intellij.modules.platform</depends>
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="Interview Study"
+                    anchor="right"
+                    factoryClass="com.interviewstudy.InterviewStudyToolWindowFactory"/>
+
+    </extensions>
+</idea-plugin>

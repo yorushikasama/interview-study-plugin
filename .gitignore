@@ -1,0 +1,16 @@
+.gradle/
+.intellijPlatform/
+.intellijPlatform-*/
+.idea/
+.kotlin/
+build/
+out/
+*.iml
+*.log
+*.jar
+*.zip
+!gradle/wrapper/gradle-wrapper.jar
+!dist/*.zip
+docs/superpowers/
+src/test/kotlin/com/interviewstudy/core/PromptBuilderCheck.kt
+src/test/kotlin/com/interviewstudy/core/MaterialProcessingCheck.kt
