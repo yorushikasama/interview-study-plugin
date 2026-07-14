@@ -242,19 +242,26 @@ private class PracticePanel(private val state: StudyState) : JPanel(BorderLayout
     private fun filters(): JPanel {
         val refresh = JButton("筛选")
         val clear = JButton("清空")
+        val more = JButton("更多筛选")
         refresh.addActionListener { refresh() }
         clear.addActionListener {
             keyword.text = ""; tag.text = ""; source.text = ""; type.selectedIndex = 0
             dueOnly.isSelected = false; favoriteOnly.isSelected = false; wrongOnly.isSelected = false
             refresh()
         }
-        return formPanel(
-            "关键词" to keyword,
-            "题型" to type,
-            "标签" to tag,
-            "来源" to source,
-            "筛选" to JPanel(FlowLayout(FlowLayout.LEFT, 0, 0)).apply { add(dueOnly); add(favoriteOnly); add(wrongOnly); add(refresh); add(clear); add(stats) }
-        )
+        more.addActionListener {
+            JOptionPane.showMessageDialog(this, formPanel("标签" to tag, "来源" to source), "更多筛选", JOptionPane.PLAIN_MESSAGE)
+            refresh()
+        }
+        return JPanel(BorderLayout(6, 4)).apply {
+            add(JPanel(BorderLayout(6, 0)).apply {
+                add(JLabel("搜索"), BorderLayout.WEST)
+                add(keyword, BorderLayout.CENTER)
+            }, BorderLayout.NORTH)
+            add(JPanel(FlowLayout(FlowLayout.LEFT, 4, 0)).apply {
+                add(type); add(dueOnly); add(favoriteOnly); add(wrongOnly); add(refresh); add(clear); add(more); add(stats)
+            }, BorderLayout.CENTER)
+        }
     }
 
     private fun actions(): JPanel {
@@ -269,6 +276,7 @@ private class PracticePanel(private val state: StudyState) : JPanel(BorderLayout
         val export = JButton("导出")
         val import = JButton("导入")
         val delete = JButton("删除")
+        val more = JButton("更多操作")
         show.addActionListener { list.selectedValue?.let { reference.text = it.answer } }
         wrong.addActionListener { updateReview(false) }
         known.addActionListener { updateReview(true) }
@@ -280,8 +288,16 @@ private class PracticePanel(private val state: StudyState) : JPanel(BorderLayout
         export.addActionListener { exportQuestions() }
         import.addActionListener { importQuestions() }
         delete.addActionListener { list.selectedValue?.let { if (confirm("删除这道题？")) { state.state.questions.remove(it); refresh() } } }
-        return JPanel(FlowLayout(FlowLayout.LEFT)).apply {
-            add(show); add(wrong); add(known); add(mastered); add(favorite); add(markWrong); add(review); add(followUp); add(export); add(import); add(delete); add(status)
+        more.addActionListener {
+            JOptionPane.showMessageDialog(
+                this,
+                JPanel(FlowLayout(FlowLayout.LEFT)).apply { add(favorite); add(markWrong); add(review); add(followUp); add(export); add(import); add(delete) },
+                "更多操作",
+                JOptionPane.PLAIN_MESSAGE
+            )
+        }
+        return JPanel(FlowLayout(FlowLayout.LEFT, 4, 0)).apply {
+            add(show); add(wrong); add(known); add(mastered); add(more); add(status)
         }
     }
 
@@ -350,7 +366,7 @@ private class PracticePanel(private val state: StudyState) : JPanel(BorderLayout
         questions.forEach(model::addElement)
         val index = questions.indexOfFirst { it.id == selectedId }.takeIf { it >= 0 } ?: if (questions.isEmpty()) -1 else 0
         list.selectedIndex = index
-        if (questions.isEmpty()) question.text = "暂无题目或筛选无结果。"
+        if (questions.isEmpty()) question.text = if (state.state.questions.isEmpty()) "暂无题目，请先到“生成题目”页生成。" else "筛选无结果，请清空或调整筛选条件。"
     }
 
     private fun reviewDate(epochDay: Long): String {
@@ -420,3 +436,4 @@ private fun <T> runAsync(button: JButton, status: JLabel, message: String, task:
         )
     }
 }
+
